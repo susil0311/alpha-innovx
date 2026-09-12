@@ -5,6 +5,8 @@ import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { AlertTriangle, ArrowLeft, ArrowRight, Bell, Check, ChevronRight, CircleHelp, ClipboardCheck, Clock3, CloudRain, Filter, GitBranch, Layers3, MapPin, Menu, Mountain, Navigation, Radio, RefreshCw, Route, ShieldCheck, SlidersHorizontal, TriangleAlert, UserRound, Waves, X, Zap } from "lucide-react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { actionItems, cascadeNodes, catchment, flashFloodPrediction, sensorRows, villages, type RiskState, type Village } from "../data";
 
 const stateMeta: Record<RiskState, { label: string; ink: string; bg: string; line: string }> = {
@@ -31,8 +33,7 @@ function RiskMap({ selected, onSelect, hazard, layer, escalation, villageSubset 
   const points = useMemo(() => (villageSubset ?? villages).map(v => ({ ...v, effective: escalation && v.state === "GREEN" ? "YELLOW" as RiskState : v.state })), [escalation, villageSubset]);
 
   useEffect(() => {
-    const L = (window as any).L;
-    if (!L || !mapRef.current || leafletMapRef.current) return;
+    if (!mapRef.current || leafletMapRef.current) return;
     const map = L.map(mapRef.current, { zoomControl: true, attributionControl: true });
     leafletMapRef.current = map;
     const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -42,12 +43,12 @@ function RiskMap({ selected, onSelect, hazard, layer, escalation, villageSubset 
     osm.addTo(map);
     tileLayerRef.current = osm;
     map.setView([30.7333, 78.4399], 12);
+    requestAnimationFrame(() => map.invalidateSize());
     return () => { map.remove(); leafletMapRef.current = null; };
   }, []);
 
   useEffect(() => {
-    const L = (window as any).L;
-    if (!L || !leafletMapRef.current) return;
+    if (!leafletMapRef.current) return;
     const map = leafletMapRef.current;
     if (tileLayerRef.current) { map.removeLayer(tileLayerRef.current); }
     if (mapType === "satellite") {
@@ -64,8 +65,7 @@ function RiskMap({ selected, onSelect, hazard, layer, escalation, villageSubset 
   }, [mapType]);
 
   useEffect(() => {
-    const L = (window as any).L;
-    if (!L || !leafletMapRef.current) return;
+    if (!leafletMapRef.current) return;
     markersRef.current.forEach(m => leafletMapRef.current.removeLayer(m));
     markersRef.current = [];
     points.forEach(v => {
@@ -85,8 +85,7 @@ function RiskMap({ selected, onSelect, hazard, layer, escalation, villageSubset 
   }, [points, onSelect]);
 
   useEffect(() => {
-    const L = (window as any).L;
-    if (!L || !leafletMapRef.current || !selected) return;
+    if (!leafletMapRef.current || !selected) return;
     leafletMapRef.current.setView([selected.lat, selected.lng], 13, { animate: true });
   }, [selected]);
 

@@ -1,0 +1,1 @@
+ALTER TABLE `operationalResources` ADD `assignedUserId` int;

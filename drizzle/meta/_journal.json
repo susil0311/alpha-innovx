@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1789137387483,
+      "tag": "0000_huge_iron_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1789138725548,
+      "tag": "0001_slippery_lockjaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1789138994154,
+      "tag": "0002_cuddly_kylun",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1789139596766,
+      "tag": "0003_clear_meltdown",
+      "breakpoints": true
+    }
+  ]
+}

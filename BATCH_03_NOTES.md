@@ -1,6 +1,6 @@
-# Sahaayak Source Batch 03
+# Flood Nexus Source Batch 03
 
-This batch re-centres the Sahaayak prototype on the **Dharali–Harsil corridor in Uttarkashi, Uttarakhand** and upgrades the operator experience for rapid flash-flood decisions.
+This batch re-centres the Flood Nexus prototype on the **Dharali–Harsil corridor in Uttarkashi, Uttarakhand** and upgrades the operator experience for rapid flash-flood decisions.
 
 ## Geographic operating picture
 

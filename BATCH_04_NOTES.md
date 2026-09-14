@@ -1,4 +1,4 @@
-# Sahaayak Source Batch 04
+# Flood Nexus Source Batch 04
 
 This batch adds the **Dharali Command Pack**, connecting the flash-flood nowcast to an executable response workflow.
 

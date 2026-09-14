@@ -1,6 +1,6 @@
-# Sahaayak Source Batch 02
+# Flood Nexus Source Batch 02
 
-This batch upgrades the Sahaayak prototype from seeded-only UI to an authenticated full-stack application with role-aware persistence.
+This batch upgrades the Flood Nexus prototype from seeded-only UI to an authenticated full-stack application with role-aware persistence.
 
 ## Included capabilities
 

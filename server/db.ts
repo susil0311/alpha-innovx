@@ -1,9 +1,20 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from "./_core/env";
-import { alertDrafts, auditEvents, commandTasks, fieldReports, InsertUser, operationalResources, users } from "../drizzle/schema";
+import { randomBytes, scryptSync } from "node:crypto";
+import { alertDrafts, auditEvents, commandTasks, fieldReports, InsertUser, operationalResources, User, users } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+const demoUsers = new Map<string, User>();
+let nextDemoUserId = 10000;
+
+export const DEMO_ACCOUNTS = [
+  { name: "District Administrator", email: "admin@floodnexus.demo", password: "FloodNexus@Admin26", role: "admin" as const, label: "Administrator" },
+  { name: "Control Room Operator", email: "operator@floodnexus.demo", password: "FloodNexus@Ops26", role: "operator" as const, label: "Control-room operator" },
+  { name: "Alert Approver", email: "approver@floodnexus.demo", password: "FloodNexus@Approve26", role: "approver" as const, label: "Alert approver" },
+  { name: "Field Officer", email: "field@floodnexus.demo", password: "FloodNexus@Field26", role: "field_officer" as const, label: "Field officer" },
+  { name: "Situation Viewer", email: "viewer@floodnexus.demo", password: "FloodNexus@View26", role: "viewer" as const, label: "Read-only viewer" },
+] as const;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -47,9 +58,63 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return result[0];
+  if (!db) return demoUsers.get(openId);
+  try {
+    const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+    return result[0] ?? demoUsers.get(openId);
+  } catch (error) {
+    console.warn("[Database] User lookup unavailable; using demo account store:", error instanceof Error ? error.message : error);
+    return demoUsers.get(openId);
+  }
+}
+
+export async function getUserByEmail(email: string) {
+  const db = await getDb();
+  const normalizedEmail = email.toLowerCase();
+  if (!db) return demoUsers.get(`email:${normalizedEmail}`);
+  try {
+    const result = await db.select().from(users).where(eq(users.email, normalizedEmail)).limit(1);
+    return result[0] ?? demoUsers.get(`email:${normalizedEmail}`);
+  } catch (error) {
+    console.warn("[Database] Email lookup unavailable; using demo account store:", error instanceof Error ? error.message : error);
+    return demoUsers.get(`email:${normalizedEmail}`);
+  }
+}
+
+export async function createEmailUser(input: { email: string; name: string; passwordHash: string; role: NonNullable<InsertUser["role"]> }) {
+  const db = await getDb();
+  const email = input.email.toLowerCase();
+  const openId = `email:${email}`;
+  const now = new Date();
+  if (!db) {
+    const demoUser: User = { id: nextDemoUserId++, openId, name: input.name, email, loginMethod: "email", passwordHash: input.passwordHash, role: input.role, createdAt: now, updatedAt: now, lastSignedIn: now };
+    demoUsers.set(openId, demoUser);
+    return demoUser;
+  }
+  try {
+    await db.insert(users).values({ openId, email, name: input.name, passwordHash: input.passwordHash, loginMethod: "email", role: input.role, lastSignedIn: now });
+    return db.select().from(users).where(eq(users.openId, openId)).limit(1).then(rows => rows[0]);
+  } catch (error) {
+    console.warn("[Database] Account persistence unavailable; using demo account store:", error instanceof Error ? error.message : error);
+    const demoUser: User = { id: nextDemoUserId++, openId, name: input.name, email, loginMethod: "email", passwordHash: input.passwordHash, role: input.role, createdAt: now, updatedAt: now, lastSignedIn: now };
+    demoUsers.set(openId, demoUser);
+    return demoUser;
+  }
+}
+
+
+function demoHashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = scryptSync(password, salt, 64).toString("hex");
+  return `scrypt$${salt}$${derivedKey}`;
+}
+
+export async function ensureDemoAccounts() {
+  for (const account of DEMO_ACCOUNTS) {
+    const existing = await getUserByEmail(account.email);
+    if (!existing) await createEmailUser({ email: account.email, name: account.name, passwordHash: demoHashPassword(account.password), role: account.role });
+  }
+  return DEMO_ACCOUNTS;
 }
 
 export async function getRecentAlerts(limit = 30) {

@@ -67,6 +67,9 @@
   html { scroll-behavior: smooth; }
   body { @apply bg-background text-foreground antialiased; font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif; }
   button:not(:disabled), a[href], select:not(:disabled), input[type="checkbox"]:not(:disabled) { @apply cursor-pointer; }
+  button, a, input, select { transition: border-color 160ms ease-out, background-color 160ms ease-out, color 160ms ease-out, box-shadow 160ms ease-out, transform 160ms ease-out; }
+  button:not(:disabled):active, a[href]:active { transform: scale(.98); }
+  button:focus-visible, a[href]:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid rgba(43,108,176,.3); outline-offset: 2px; }
   ::selection { background: #d5e9e6; color: #0b1f33; }
 }
 
@@ -87,4 +90,8 @@
   @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
   .pulse-ring { animation: pulseRing 2.4s ease-out infinite; }
   @keyframes pulseRing { 0%, 100% { opacity: .7; transform: scale(.9); } 50% { opacity: .15; transform: scale(1.25); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }

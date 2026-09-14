@@ -9,6 +9,7 @@ import Replay from "./pages/Replay";
 import FieldReports from "./pages/FieldReports";
 import CommandPack from "./pages/CommandPack";
 import UserProfile from "./pages/UserProfile";
+import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
           <Toaster position="top-right" />
           <Switch>
             <Route path="/" component={Home} />
+            <Route path="/login" component={Login} />
             <Route path="/control-room" component={ControlRoom} />
             <Route path="/replay" component={Replay} />
             <Route path="/field-reports" component={FieldReports} />

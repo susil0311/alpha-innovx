@@ -1,6 +1,6 @@
+import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { ForbiddenError } from "@shared/_core/errors";
-import { OAuth2Client } from "google-auth-library";
 import { parse as parseCookieHeader } from "cookie";
 import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
@@ -8,62 +8,21 @@ import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
 
-export type SessionPayload = {
-  openId: string;
-  name: string;
-  email: string;
-};
-
+export type SessionPayload = { openId: string; name: string; email: string };
 export type AuthenticatedUser = User;
 
-class GoogleAuthService {
-  private readonly client: OAuth2Client;
+export function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = scryptSync(password, salt, 64).toString("hex");
+  return `scrypt$${salt}$${derivedKey}`;
+}
 
-  constructor() {
-    this.client = new OAuth2Client(ENV.googleClientId, ENV.googleClientSecret);
-  }
-
-  getAuthorizationUrl(state: string, redirectUri: string) {
-    if (!ENV.googleClientId || !ENV.googleClientSecret) {
-      throw new Error("Google OAuth is not configured");
-    }
-
-    return new OAuth2Client(ENV.googleClientId, ENV.googleClientSecret, redirectUri).generateAuthUrl({
-      access_type: "online",
-      prompt: "select_account",
-      scope: ["openid", "email", "profile"],
-      state,
-    });
-  }
-
-  async exchangeCode(code: string, redirectUri: string) {
-    const client = new OAuth2Client(ENV.googleClientId, ENV.googleClientSecret, redirectUri);
-    const { tokens } = await client.getToken(code);
-    if (!tokens.id_token) throw new Error("Google did not return an ID token");
-
-    const ticket = await this.client.verifyIdToken({
-      idToken: tokens.id_token,
-      audience: ENV.googleClientId,
-    });
-    const payload = ticket.getPayload();
-    if (!payload?.sub || !payload.email) throw new Error("Google profile is incomplete");
-    if (payload.email_verified === false) throw new Error("Google email is not verified");
-
-    const allowedDomains = ENV.googleAllowedDomains;
-    if (allowedDomains.length > 0) {
-      const domain = payload.email.split("@")[1]?.toLowerCase();
-      if (!domain || !allowedDomains.includes(domain)) {
-        throw new Error("This Google account domain is not allowed");
-      }
-    }
-
-    return {
-      openId: `google:${payload.sub}`,
-      name: payload.name ?? payload.email.split("@")[0] ?? "Google operator",
-      email: payload.email,
-      picture: payload.picture ?? null,
-    };
-  }
+export function verifyPassword(password: string, storedHash: string) {
+  const [algorithm, salt, storedKey] = storedHash.split("$");
+  if (algorithm !== "scrypt" || !salt || !storedKey) return false;
+  const derivedKey = scryptSync(password, salt, 64);
+  const expectedKey = Buffer.from(storedKey, "hex");
+  return derivedKey.length === expectedKey.length && timingSafeEqual(derivedKey, expectedKey);
 }
 
 class SessionService {
@@ -88,8 +47,7 @@ class SessionService {
       const openId = typeof payload.openId === "string" ? payload.openId : "";
       const name = typeof payload.name === "string" ? payload.name : "";
       const email = typeof payload.email === "string" ? payload.email : "";
-      if (!openId || !name || !email) return null;
-      return { openId, name, email };
+      return openId && name && email ? { openId, name, email } : null;
     } catch {
       return null;
     }
@@ -97,7 +55,6 @@ class SessionService {
 }
 
 class AuthSDK {
-  readonly google = new GoogleAuthService();
   private readonly sessions = new SessionService();
 
   async createSessionToken(user: Pick<SessionPayload, "openId" | "name" | "email">) {
@@ -109,19 +66,16 @@ class AuthSDK {
     let sessionToken = cookies[COOKIE_NAME];
     if (!sessionToken) {
       const authorization = req.headers.authorization;
-      if (typeof authorization === "string" && authorization.startsWith("Bearer ")) {
-        sessionToken = authorization.slice("Bearer ".length);
-      }
+      if (typeof authorization === "string" && authorization.startsWith("Bearer ")) sessionToken = authorization.slice("Bearer ".length);
     }
-
     const session = await this.sessions.verifySession(sessionToken);
-    if (!session) throw ForbiddenError("Invalid Google session");
-
+    if (!session) throw ForbiddenError("Invalid email session");
     const user = await db.getUserByOpenId(session.openId);
-    if (!user) throw ForbiddenError("Google user not found");
+    if (!user) throw ForbiddenError("Account not found");
     await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
     return user;
   }
 }
 
 export const sdk = new AuthSDK();
+export { COOKIE_NAME };

@@ -11,8 +11,8 @@ import {
 function AlphaInnovXLogo({ size = 36 }: { size?: number }) {
   return (
     <img
-      src="/alpha-innovx-logo.png"
-      alt="Alpha InnovX"
+      src="/flood-nexus-logo.png"
+      alt="Flood Nexus"
       width={size}
       height={size}
       style={{ objectFit: "contain" }}
@@ -26,7 +26,7 @@ function Brand({ compact = false }: { compact?: boolean }) {
       <AlphaInnovXLogo size={36} />
       {!compact && (
         <div>
-          <div className="text-sm font-bold tracking-[.18em] text-white">ALPHA INNOVX</div>
+          <div className="text-sm font-bold tracking-[.18em] text-white">FLOOD NEXUS</div>
           <div className="text-[8px] font-semibold tracking-[.16em] text-white/45">CONTROL ROOM</div>
         </div>
       )}
@@ -207,10 +207,10 @@ export default function UserProfile() {
                 <Bell className="size-3.5" /> Notifications
               </div>
               <div className="space-y-3">
-                {[
+                {([
                   ["Push notifications", "notifications" as const],
                   ["Email alerts for RED warnings", "emailAlerts" as const],
-                ].map(([label, key]) => (
+                ] as const).map(([label, key]) => (
                   <label key={key} className="flex items-center justify-between cursor-pointer">
                     <span className="text-sm font-medium text-[#243447]">{label}</span>
                     <button

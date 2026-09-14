@@ -1,4 +1,4 @@
-# Sahaayak Source Batch 10 — Google OAuth Migration
+# Flood Nexus Source Batch 10 — Google OAuth Migration
 
 This batch removes the prior managed-platform authentication and runtime integration completely from the active project. Authentication now uses Google OAuth 2.0 with server-side ID-token verification through `google-auth-library`, CSRF-protected state cookies, signed application sessions, and role promotion through configured Google administrator email addresses.
 

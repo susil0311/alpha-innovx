@@ -12,7 +12,7 @@ const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError) || typeof window === "undefined") return;
-  if (error.message === UNAUTHED_ERR_MSG && window.location.pathname !== "/api/auth/google") startLogin();
+  if (error.message === UNAUTHED_ERR_MSG && window.location.pathname !== "/login") startLogin();
 };
 
 queryClient.getQueryCache().subscribe(event => {

@@ -111,6 +111,32 @@ export function calculateFlashFloodNowcast(input: { rain15mm: number; soilSatura
   };
 }
 
+export type SimulationInput = {
+  rain15mm: number;
+  soilSaturation: number;
+  riverRiseM30: number;
+  debrisLikelihood: number;
+  sensorConfidence: number;
+  slopeSusceptibility: number;
+  forecastRain6h: number;
+};
+
+export function calculateSimulation(input: SimulationInput) {
+  const factors = [
+    { label: "Rainfall intensity", value: Math.min(input.rain15mm / 50, 1), weight: 0.3 },
+    { label: "Soil saturation", value: Math.min(input.soilSaturation / 100, 1), weight: 0.2 },
+    { label: "River rise rate", value: Math.min(input.riverRiseM30 / 0.8, 1), weight: 0.15 },
+    { label: "Debris-flow likelihood", value: input.debrisLikelihood, weight: 0.15 },
+    { label: "Slope susceptibility", value: input.slopeSusceptibility, weight: 0.1 },
+    { label: "6h forecast rainfall", value: Math.min(input.forecastRain6h / 80, 1), weight: 0.1 },
+  ];
+  const probability = Math.min(0.99, Math.max(0.02, factors.reduce((sum, factor) => sum + factor.value * factor.weight, 0)));
+  const state: RiskState = probability >= 0.8 ? "RED" : probability >= 0.6 ? "ORANGE" : probability >= 0.4 ? "YELLOW" : "GREEN";
+  const confidence = Math.max(0.5, Math.min(0.96, input.sensorConfidence - (input.sensorConfidence < 0.75 ? 0.08 : 0)));
+  const leadTimeMinutes = state === "RED" ? 20 : state === "ORANGE" ? 45 : state === "YELLOW" ? 90 : 180;
+  return { state, probability, confidence, leadTimeMinutes, factors, dataQuality: Math.round(confidence * 100) };
+}
+
 export const flashFloodPrediction = calculateFlashFloodNowcast({
   rain15mm: 42,
   soilSaturation: 91,
@@ -126,6 +152,27 @@ export const routeSegments = [
   { id: "R-03", name: "Harsil → Jhala corridor", status: "CAUTION", tone: "orange", reason: "Rockfall watch above Gangotri Road", verified: "14:28 IST", owner: "PWD patrol" },
   { id: "R-04", name: "Mukhba alternate access", status: "OPEN", tone: "green", reason: "Use only for assisted movement", verified: "14:19 IST", owner: "Village team" },
 ];
+
+export type DynamicRoute = {
+  name: string;
+  status: "RECOMMENDED" | "BACKUP" | "REJECTED";
+  trafficMinutes: number;
+  hazardArrivalMinutes: number;
+  evacuationMinutes: number;
+  safetyMarginMinutes: number;
+  confidence: number;
+  reason: string;
+  warning?: string;
+};
+
+export function calculateDynamicRoutes() {
+  const candidates: DynamicRoute[] = [
+    { name: "Dharali → Harsil high-ground route", status: "RECOMMENDED", trafficMinutes: 24, hazardArrivalMinutes: 85, evacuationMinutes: 34, safetyMarginMinutes: 51, confidence: 0.86, reason: "Fastest verified high-ground route with sufficient cascade margin" },
+    { name: "Mukhba alternate access", status: "BACKUP", trafficMinutes: 34, hazardArrivalMinutes: 110, evacuationMinutes: 44, safetyMarginMinutes: 66, confidence: 0.73, reason: "Backup route remains open for assisted movement", warning: "Use only after village-team confirmation" },
+    { name: "Dharali low-bank approach", status: "REJECTED", trafficMinutes: 10, hazardArrivalMinutes: 15, evacuationMinutes: 20, safetyMarginMinutes: -5, confidence: 0.94, reason: "Rejected: debris-flow arrival is earlier than evacuation completion", warning: "CLOSE NOW · do not enter" },
+  ];
+  return candidates;
+}
 
 export const shelterStatus = [
   { name: "Harsil Army Ground", location: "Harsil · high ground", capacity: "180 / 420", status: "READY", tone: "green", checks: "Lighting · water · transport" },

@@ -1,5 +1,5 @@
 {
-  "name": "sahaayak",
+  "name": "flood-nexus",
   "version": "1.0.0",
   "type": "module",
   "license": "MIT",
@@ -46,6 +46,7 @@
     "@trpc/client": "^11.6.0",
     "@trpc/react-query": "^11.6.0",
     "@trpc/server": "^11.6.0",
+    "@wlearn/xgboost": "^0.2.0",
     "axios": "^1.12.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -57,7 +58,6 @@
     "embla-carousel-react": "^8.6.0",
     "express": "^4.21.2",
     "framer-motion": "^12.23.22",
-    "google-auth-library": "^11.0.2",
     "input-otp": "^1.4.2",
     "jose": "6.1.0",
     "leaflet": "^1.9.4",

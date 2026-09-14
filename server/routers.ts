@@ -1,11 +1,12 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { COOKIE_NAME } from "@shared/const";
+import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDharaliHistoricalWeather, getDharaliLiveData, historicalDharaliEvents } from "./liveData";
-import { createAlertDraft, createFieldReport, getAssignmentCandidates, getCommandTasks, getOperationalResources, getRecentAlerts, getRecentAuditEvents, getRecentFieldReports, setCommandTaskStatus, updateAlertStatus, updateFieldReportStatus, updateOperationalResource } from "./db";
+import { createAlertDraft, createEmailUser, createFieldReport, ensureDemoAccounts, getAssignmentCandidates, getCommandTasks, getOperationalResources, getRecentAlerts, getRecentAuditEvents, getRecentFieldReports, getUserByEmail, setCommandTaskStatus, updateAlertStatus, updateFieldReportStatus, updateOperationalResource } from "./db";
+import { hashPassword, sdk, verifyPassword } from "./_core/sdk";
 
 const roleProcedure = (roles: string[]) => protectedProcedure.use(({ ctx, next }) => {
   if (!roles.includes(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: `Role required: ${roles.join(", ")}` });
@@ -57,6 +58,24 @@ export const appRouter = router({
   }),
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    demoAccounts: publicProcedure.query(() => ensureDemoAccounts()),
+    register: publicProcedure.input(z.object({ name: z.string().trim().min(2).max(120), email: z.string().email().max(320), password: z.string().min(8).max(128), role: z.enum(["operator", "approver", "field_officer", "viewer"]).default("viewer") })).mutation(async ({ input, ctx }) => {
+      const email = input.email.toLowerCase();
+      if (await getUserByEmail(email)) throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
+      const user = await createEmailUser({ email, name: input.name, passwordHash: hashPassword(input.password), role: input.role });
+      if (!user) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Account could not be created." });
+      const token = await sdk.createSessionToken({ openId: user.openId, name: user.name ?? input.name, email });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+      return user;
+    }),
+    login: publicProcedure.input(z.object({ email: z.string().email().max(320), password: z.string().min(1).max(128) })).mutation(async ({ input, ctx }) => {
+      const email = input.email.toLowerCase();
+      const user = await getUserByEmail(email);
+      if (!user?.passwordHash || !verifyPassword(input.password, user.passwordHash)) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+      const token = await sdk.createSessionToken({ openId: user.openId, name: user.name ?? email.split("@")[0], email });
+      ctx.res.cookie(COOKIE_NAME, token, { ...getSessionCookieOptions(ctx.req), maxAge: ONE_YEAR_MS });
+      return user;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

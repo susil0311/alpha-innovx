@@ -91,6 +91,10 @@
   .pulse-ring { animation: pulseRing 2.4s ease-out infinite; }
   @keyframes pulseRing { 0%, 100% { opacity: .7; transform: scale(.9); } 50% { opacity: .15; transform: scale(1.25); } }
 }
+/* Keep Leaflet's internal layers below drawers and alert workflows. */
+.leaflet-container { z-index: 0; }
+.leaflet-pane, .leaflet-top, .leaflet-bottom { z-index: 1; }
+.leaflet-control { z-index: 2; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }

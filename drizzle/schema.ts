@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { double, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
@@ -97,3 +97,32 @@ export const operationalResources = mysqlTable("operationalResources", {
 });
 
 export type OperationalResource = typeof operationalResources.$inferSelect;
+
+export const sensorReadings = mysqlTable("sensorReadings", {
+  id: int("id").autoincrement().primaryKey(),
+  sensorKey: varchar("sensorKey", { length: 64 }).notNull(),
+  metric: varchar("metric", { length: 64 }).notNull(),
+  value: double("value").notNull(),
+  unit: varchar("unit", { length: 24 }).notNull(),
+  observedAt: timestamp("observedAt").notNull(),
+  receivedAt: timestamp("receivedAt").defaultNow().notNull(),
+  quality: mysqlEnum("quality", ["GOOD", "STALE", "INVALID"]).default("GOOD").notNull(),
+  metadata: text("metadata"),
+});
+
+export type SensorReading = typeof sensorReadings.$inferSelect;
+
+export const floodPredictions = mysqlTable("floodPredictions", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 64 }).notNull(),
+  state: mysqlEnum("state", ["GREEN", "YELLOW", "ORANGE", "RED"]).notNull(),
+  probability: double("probability").notNull(),
+  confidence: double("confidence").notNull(),
+  leadTimeMinutes: int("leadTimeMinutes").notNull(),
+  modelVersion: varchar("modelVersion", { length: 32 }).notNull(),
+  evidence: text("evidence").notNull(),
+  limitations: text("limitations").notNull(),
+  generatedAt: timestamp("generatedAt").defaultNow().notNull(),
+});
+
+export type FloodPrediction = typeof floodPredictions.$inferSelect;

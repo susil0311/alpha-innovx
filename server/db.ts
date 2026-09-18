@@ -2,7 +2,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from "./_core/env";
 import { randomBytes, scryptSync } from "node:crypto";
-import { alertDrafts, auditEvents, commandTasks, fieldReports, InsertUser, operationalResources, User, users } from "../drizzle/schema";
+import { alertDrafts, auditEvents, commandTasks, fieldReports, floodPredictions, InsertUser, operationalResources, sensorReadings, User, users } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 const demoUsers = new Map<string, User>();
@@ -217,4 +217,33 @@ export async function updateOperationalResource(input: { resourceKey: string; re
   if (!row) throw new Error("Operational resource was not found after update");
   await createAuditEvent({ entityType: input.resourceType.toLowerCase(), entityId: row.id, action: `resource_${input.status.toLowerCase()}`, actorId, note: input.note ?? `Assigned to ${resolvedOwner}` });
   return row;
+}
+
+export async function recordSensorReadings(readings: Array<typeof sensorReadings.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  if (!readings.length) return [];
+  await db.insert(sensorReadings).values(readings);
+  return db.select().from(sensorReadings).orderBy(desc(sensorReadings.receivedAt)).limit(readings.length);
+}
+
+export async function getRecentSensorReadings(sensorKey?: string, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  return sensorKey
+    ? db.select().from(sensorReadings).where(eq(sensorReadings.sensorKey, sensorKey)).orderBy(desc(sensorReadings.observedAt)).limit(limit)
+    : db.select().from(sensorReadings).orderBy(desc(sensorReadings.observedAt)).limit(limit);
+}
+
+export async function recordFloodPrediction(input: typeof floodPredictions.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const result = await db.insert(floodPredictions).values(input);
+  return db.select().from(floodPredictions).where(eq(floodPredictions.id, Number(result[0].insertId))).limit(1).then(rows => rows[0]);
+}
+
+export async function getRecentFloodPredictions(locationKey: string, limit = 50) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(floodPredictions).where(eq(floodPredictions.locationKey, locationKey)).orderBy(desc(floodPredictions.generatedAt)).limit(limit);
 }

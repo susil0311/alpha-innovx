@@ -88,20 +88,32 @@ export const methodSteps = [
 ];
 
 export function calculateFlashFloodNowcast(input: { rain15mm: number; soilSaturation: number; riverRiseM30: number; debrisLikelihood: number; sensorConfidence: number }) {
+  // Hazard likelihood and evidence confidence are deliberately separate. Missing or
+  // stale sensors must lower confidence, never increase the probability of flooding.
   const intensity = Math.min(input.rain15mm / 50, 1);
   const saturation = Math.min(input.soilSaturation / 100, 1);
   const riverRise = Math.min(input.riverRiseM30 / 0.8, 1);
-  const debris = Math.min(input.debrisLikelihood, 1);
-  const raw = intensity * 0.32 + saturation * 0.22 + riverRise * 0.16 + debris * 0.22 + (1 - input.sensorConfidence) * 0.08;
-  const probability = Math.min(0.99, Math.max(0.05, raw));
+  const debris = Math.min(Math.max(input.debrisLikelihood, 0), 1);
+  const baseLikelihood = intensity * 0.34 + saturation * 0.20 + riverRise * 0.12 + debris * 0.26;
+  const compoundTrigger = intensity >= 0.75 && saturation >= 0.80 && debris >= 0.75 ? 0.10 : intensity >= 0.60 && saturation >= 0.70 ? 0.04 : 0;
+  const probability = Math.min(0.99, Math.max(0.02, baseLikelihood + compoundTrigger));
   const state: RiskState = probability >= 0.8 ? "RED" : probability >= 0.6 ? "ORANGE" : probability >= 0.4 ? "YELLOW" : "GREEN";
+  const evidenceConfidence = Math.max(0.45, Math.min(0.96, input.sensorConfidence * (compoundTrigger > 0 ? 0.96 : 1)));
   return {
     state,
     probability,
-    confidence: Math.max(0.55, Math.min(0.96, input.sensorConfidence - (input.debrisLikelihood > 0.8 ? 0.04 : 0))),
+    confidence: evidenceConfidence,
+    baseLikelihood,
+    compoundTrigger,
+    factors: [
+      { label: "15-minute rainfall intensity", value: intensity, weight: 0.34, source: "RAIN-KG-01" },
+      { label: "Catchment soil saturation", value: saturation, weight: 0.20, source: "SOIL-DHR-01" },
+      { label: "Bhagirathi rise rate", value: riverRise, weight: 0.12, source: "WL-BHG-02" },
+      { label: "Debris-flow likelihood", value: debris, weight: 0.26, source: "Cascade model" },
+    ],
     arrivalWindow: probability >= 0.8 ? "20–35 min" : probability >= 0.6 ? "35–60 min" : "1–3 h",
     trigger: `${input.rain15mm} mm / 15m over Kheer Gad + ${input.soilSaturation}% soil saturation`,
-    keyUncertainty: input.sensorConfidence < 0.8 ? "Kheer Gad camera offline; field confirmation requested" : "Sensor agreement is stable; continue watch",
+    keyUncertainty: input.sensorConfidence < 0.8 ? "Kheer Gad camera offline; likelihood remains high but confidence is capped" : "Sensor agreement is stable; continue watch",
     immediateActions: [
       "Evacuate low-bank Dharali households away from Kheer Gad and Bhagirathi edge",
       "Open Harsil Army Ground and verify transport, lighting, water, and capacity",

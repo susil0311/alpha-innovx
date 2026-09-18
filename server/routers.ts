@@ -5,8 +5,9 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDharaliHistoricalWeather, getDharaliLiveData, historicalDharaliEvents } from "./liveData";
-import { createAlertDraft, createEmailUser, createFieldReport, ensureDemoAccounts, getAssignmentCandidates, getCommandTasks, getOperationalResources, getRecentAlerts, getRecentAuditEvents, getRecentFieldReports, getUserByEmail, setCommandTaskStatus, updateAlertStatus, updateFieldReportStatus, updateOperationalResource } from "./db";
+import { createAlertDraft, createEmailUser, createFieldReport, ensureDemoAccounts, getAssignmentCandidates, getCommandTasks, getOperationalResources, getRecentAlerts, getRecentAuditEvents, getRecentFieldReports, getRecentFloodPredictions, getRecentSensorReadings, getUserByEmail, recordFloodPrediction, recordSensorReadings, setCommandTaskStatus, updateAlertStatus, updateFieldReportStatus, updateOperationalResource } from "./db";
 import { hashPassword, sdk, verifyPassword } from "./_core/sdk";
+import { evaluateFlashFloodAlert } from "@shared/alertPolicy";
 
 const roleProcedure = (roles: string[]) => protectedProcedure.use(({ ctx, next }) => {
   if (!roles.includes(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: `Role required: ${roles.join(", ")}` });
@@ -18,6 +19,7 @@ const fieldProcedure = roleProcedure(["admin", "operator", "field_officer"]);
 const approverProcedure = roleProcedure(["admin", "approver"]);
 const resourceUpdateProcedure = roleProcedure(["admin", "operator", "approver", "field_officer"]);
 const resourceAssignProcedure = roleProcedure(["admin", "operator", "approver"]);
+const sensorProcedure = roleProcedure(["admin", "operator"]);
 
 const alertInput = z.object({
   title: z.string().min(3),
@@ -49,12 +51,57 @@ const reportInput = z.object({
   photoUrl: z.string().url().optional(),
 });
 
+const sensorReadingInput = z.object({
+  sensorKey: z.string().trim().min(3).max(64),
+  metric: z.enum(["rain_15m", "river_rise_30m", "soil_saturation", "debris_likelihood"]),
+  value: z.number().finite(),
+  unit: z.string().trim().min(1).max(24),
+  observedAt: z.coerce.date(),
+  quality: z.enum(["GOOD", "STALE", "INVALID"]).default("GOOD"),
+  metadata: z.record(z.string(), z.string()).optional(),
+});
+
+const predictionInput = z.object({
+  locationKey: z.string().trim().min(2).max(64),
+  state: z.enum(["GREEN", "YELLOW", "ORANGE", "RED"]),
+  probability: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1),
+  leadTimeMinutes: z.number().int().min(0).max(1440),
+  modelVersion: z.string().trim().min(1).max(32),
+  evidence: z.record(z.string(), z.unknown()),
+  limitations: z.array(z.string().min(1)).max(20),
+});
+
+const alertEvaluationInput = z.object({
+  probability: z.number().min(0).max(1),
+  confidence: z.number().min(0).max(1),
+  leadTimeMinutes: z.number().int().min(0).max(1440),
+  physicalTrigger: z.boolean(),
+  criticalSignalsHealthy: z.boolean(),
+  independentSignals: z.number().int().min(0).max(20),
+  staleCriticalSignals: z.array(z.string().min(1).max(120)).max(20),
+});
+
 export const appRouter = router({
   system: systemRouter,
   liveData: router({
     dharali: publicProcedure.query(() => getDharaliLiveData()),
     historical: publicProcedure.query(() => historicalDharaliEvents),
     historicalWeather: publicProcedure.query(() => getDharaliHistoricalWeather()),
+  }),
+  sensors: router({
+    recent: sensorProcedure.input(z.object({ sensorKey: z.string().trim().min(3).max(64).optional(), limit: z.number().int().min(1).max(500).default(100) }).optional()).query(({ input }) => getRecentSensorReadings(input?.sensorKey, input?.limit ?? 100)),
+    ingest: sensorProcedure.input(z.union([sensorReadingInput, z.array(sensorReadingInput).min(1).max(100)])).mutation(({ input }) => {
+      const readings = Array.isArray(input) ? input : [input];
+      return recordSensorReadings(readings.map(reading => ({ ...reading, metadata: reading.metadata ? JSON.stringify(reading.metadata) : null })));
+    }),
+  }),
+  predictions: router({
+    recent: sensorProcedure.input(z.object({ locationKey: z.string().trim().min(2).max(64), limit: z.number().int().min(1).max(100).default(50) })).query(({ input }) => getRecentFloodPredictions(input.locationKey, input.limit)),
+    record: sensorProcedure.input(predictionInput).mutation(({ input }) => recordFloodPrediction({ ...input, evidence: JSON.stringify(input.evidence), limitations: JSON.stringify(input.limitations) })),
+  }),
+  alertEngine: router({
+    evaluate: sensorProcedure.input(alertEvaluationInput).query(({ input }) => evaluateFlashFloodAlert(input)),
   }),
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

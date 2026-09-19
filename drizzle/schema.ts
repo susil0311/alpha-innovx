@@ -126,3 +126,33 @@ export const floodPredictions = mysqlTable("floodPredictions", {
 });
 
 export type FloodPrediction = typeof floodPredictions.$inferSelect;
+
+export const floodEvents = mysqlTable("floodEvents", {
+  id: int("id").autoincrement().primaryKey(),
+  eventKey: varchar("eventKey", { length: 64 }).notNull().unique(),
+  locationKey: varchar("locationKey", { length: 64 }).notNull(),
+  startedAt: timestamp("startedAt").notNull(),
+  endedAt: timestamp("endedAt"),
+  severity: mysqlEnum("severity", ["WATCH", "WARNING", "FLASH_FLOOD", "DEBRIS_FLOW"]).notNull(),
+  verified: int("verified").notNull().default(0),
+  verificationSource: varchar("verificationSource", { length: 255 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type FloodEvent = typeof floodEvents.$inferSelect;
+
+export const alertDecisions = mysqlTable("alertDecisions", {
+  id: int("id").autoincrement().primaryKey(),
+  locationKey: varchar("locationKey", { length: 64 }).notNull(),
+  level: mysqlEnum("level", ["GREEN", "YELLOW", "ORANGE", "RED"]).notNull(),
+  probability: double("probability").notNull(),
+  confidence: double("confidence").notNull(),
+  leadTimeMinutes: int("leadTimeMinutes").notNull(),
+  reason: text("reason").notNull(),
+  limitations: text("limitations").notNull(),
+  recommendedActions: text("recommendedActions").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AlertDecision = typeof alertDecisions.$inferSelect;

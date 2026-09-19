@@ -5,9 +5,10 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { getDharaliHistoricalWeather, getDharaliLiveData, historicalDharaliEvents } from "./liveData";
-import { createAlertDraft, createEmailUser, createFieldReport, ensureDemoAccounts, getAssignmentCandidates, getCommandTasks, getOperationalResources, getRecentAlerts, getRecentAuditEvents, getRecentFieldReports, getRecentFloodPredictions, getRecentSensorReadings, getUserByEmail, recordFloodPrediction, recordSensorReadings, setCommandTaskStatus, updateAlertStatus, updateFieldReportStatus, updateOperationalResource } from "./db";
+import { createAlertDraft, createEmailUser, createFieldReport, createFloodEvent, ensureDemoAccounts, getAssignmentCandidates, getCommandTasks, getFloodEvents, getOperationalResources, getRecentAlerts, getRecentAuditEvents, getRecentFieldReports, getRecentFloodPredictions, getRecentSensorReadings, getUserByEmail, recordAlertDecision, recordFloodPrediction, recordSensorReadings, setCommandTaskStatus, updateAlertStatus, updateFieldReportStatus, updateOperationalResource } from "./db";
 import { hashPassword, sdk, verifyPassword } from "./_core/sdk";
 import { evaluateFlashFloodAlert } from "@shared/alertPolicy";
+import { validateObservation } from "@shared/dataPipeline";
 
 const roleProcedure = (roles: string[]) => protectedProcedure.use(({ ctx, next }) => {
   if (!roles.includes(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: `Role required: ${roles.join(", ")}` });
@@ -20,6 +21,7 @@ const approverProcedure = roleProcedure(["admin", "approver"]);
 const resourceUpdateProcedure = roleProcedure(["admin", "operator", "approver", "field_officer"]);
 const resourceAssignProcedure = roleProcedure(["admin", "operator", "approver"]);
 const sensorProcedure = roleProcedure(["admin", "operator"]);
+const eventProcedure = roleProcedure(["admin", "operator", "field_officer"]);
 
 const alertInput = z.object({
   title: z.string().min(3),
@@ -58,6 +60,7 @@ const sensorReadingInput = z.object({
   unit: z.string().trim().min(1).max(24),
   observedAt: z.coerce.date(),
   quality: z.enum(["GOOD", "STALE", "INVALID"]).default("GOOD"),
+  source: z.enum(["IMD", "CWC", "NWIC", "IOT", "NASA_GPM", "BHUVAN", "FIELD_REPORT"]).optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 });
 
@@ -82,6 +85,19 @@ const alertEvaluationInput = z.object({
   staleCriticalSignals: z.array(z.string().min(1).max(120)).max(20),
 });
 
+const floodEventInput = z.object({
+  eventKey: z.string().trim().min(3).max(64),
+  locationKey: z.string().trim().min(2).max(64),
+  startedAt: z.coerce.date(),
+  endedAt: z.coerce.date().optional(),
+  severity: z.enum(["WATCH", "WARNING", "FLASH_FLOOD", "DEBRIS_FLOW"]),
+  verified: z.boolean().default(false),
+  verificationSource: z.string().trim().min(3).max(255),
+  notes: z.string().max(2000).optional(),
+});
+
+const recordedAlertInput = alertEvaluationInput.extend({ locationKey: z.string().trim().min(2).max(64) });
+
 export const appRouter = router({
   system: systemRouter,
   liveData: router({
@@ -93,7 +109,11 @@ export const appRouter = router({
     recent: sensorProcedure.input(z.object({ sensorKey: z.string().trim().min(3).max(64).optional(), limit: z.number().int().min(1).max(500).default(100) }).optional()).query(({ input }) => getRecentSensorReadings(input?.sensorKey, input?.limit ?? 100)),
     ingest: sensorProcedure.input(z.union([sensorReadingInput, z.array(sensorReadingInput).min(1).max(100)])).mutation(({ input }) => {
       const readings = Array.isArray(input) ? input : [input];
-      return recordSensorReadings(readings.map(reading => ({ ...reading, metadata: reading.metadata ? JSON.stringify(reading.metadata) : null })));
+      return recordSensorReadings(readings.map(reading => {
+        const validation = validateObservation(reading);
+        const { source, ...storedReading } = reading;
+        return { ...storedReading, quality: validation.quality, metadata: JSON.stringify({ ...reading.metadata, source, qualityReasons: validation.reasons }) };
+      }));
     }),
   }),
   predictions: router({
@@ -102,6 +122,15 @@ export const appRouter = router({
   }),
   alertEngine: router({
     evaluate: sensorProcedure.input(alertEvaluationInput).query(({ input }) => evaluateFlashFloodAlert(input)),
+    evaluateAndRecord: sensorProcedure.input(recordedAlertInput).mutation(({ input }) => {
+      const { locationKey, ...evaluationInput } = input;
+      const evaluation = evaluateFlashFloodAlert(evaluationInput);
+      return recordAlertDecision({ locationKey, level: evaluation.level, probability: input.probability, confidence: input.confidence, leadTimeMinutes: input.leadTimeMinutes, reason: evaluation.reason, limitations: JSON.stringify(evaluation.limitations), recommendedActions: JSON.stringify(evaluation.recommendedActions) });
+    }),
+  }),
+  floodEvents: router({
+    recent: eventProcedure.input(z.object({ locationKey: z.string().trim().min(2).max(64), limit: z.number().int().min(1).max(200).default(200) })).query(({ input }) => getFloodEvents(input.locationKey, input.limit)),
+    create: eventProcedure.input(floodEventInput).mutation(({ input }) => createFloodEvent({ ...input, verified: input.verified ? 1 : 0 })),
   }),
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),

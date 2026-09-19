@@ -2,7 +2,7 @@ import { desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { ENV } from "./_core/env";
 import { randomBytes, scryptSync } from "node:crypto";
-import { alertDrafts, auditEvents, commandTasks, fieldReports, floodPredictions, InsertUser, operationalResources, sensorReadings, User, users } from "../drizzle/schema";
+import { alertDecisions, alertDrafts, auditEvents, commandTasks, fieldReports, floodEvents, floodPredictions, InsertUser, operationalResources, sensorReadings, User, users } from "../drizzle/schema";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 const demoUsers = new Map<string, User>();
@@ -246,4 +246,24 @@ export async function getRecentFloodPredictions(locationKey: string, limit = 50)
   const db = await getDb();
   if (!db) return [];
   return db.select().from(floodPredictions).where(eq(floodPredictions.locationKey, locationKey)).orderBy(desc(floodPredictions.generatedAt)).limit(limit);
+}
+
+export async function createFloodEvent(input: typeof floodEvents.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  await db.insert(floodEvents).values(input);
+  return db.select().from(floodEvents).where(eq(floodEvents.eventKey, input.eventKey)).limit(1).then(rows => rows[0]);
+}
+
+export async function getFloodEvents(locationKey: string, limit = 200) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(floodEvents).where(eq(floodEvents.locationKey, locationKey)).orderBy(desc(floodEvents.startedAt)).limit(limit);
+}
+
+export async function recordAlertDecision(input: typeof alertDecisions.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("Database is not available");
+  const result = await db.insert(alertDecisions).values(input);
+  return db.select().from(alertDecisions).where(eq(alertDecisions.id, Number(result[0].insertId))).limit(1).then(rows => rows[0]);
 }

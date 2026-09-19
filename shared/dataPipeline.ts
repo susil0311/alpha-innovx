@@ -1,4 +1,4 @@
-export type ObservationMetric = "rain_15m" | "river_rise_30m" | "soil_saturation" | "debris_likelihood";
+export type ObservationMetric = "rain_15m" | "river_rise_30m" | "soil_saturation" | "debris_likelihood" | "wind_speed_hourly";
 export type ObservationQuality = "GOOD" | "STALE" | "INVALID";
 
 export type Observation = {
@@ -22,6 +22,7 @@ const bounds: Record<ObservationMetric, { min: number; max: number; units: strin
   river_rise_30m: { min: -10, max: 10, units: ["m", "m/30m"] },
   soil_saturation: { min: 0, max: 100, units: ["%"] },
   debris_likelihood: { min: 0, max: 1, units: ["probability"] },
+  wind_speed_hourly: { min: 0, max: 300, units: ["km/h"] },
 };
 
 export function validateObservation(observation: Observation, now = new Date()): QualityResult {
@@ -48,6 +49,7 @@ export type FeatureWindow = {
   soilSaturation: number | null;
   riverRiseM30: number | null;
   debrisLikelihood: number | null;
+  windSpeedHourly: number | null;
   goodObservationCount: number;
   staleObservationCount: number;
   invalidObservationCount: number;
@@ -74,6 +76,7 @@ export function buildFeatureWindow(locationKey: string, observations: Observatio
     soilSaturation: latest("soil_saturation"),
     riverRiseM30: latest("river_rise_30m"),
     debrisLikelihood: latest("debris_likelihood"),
+    windSpeedHourly: latest("wind_speed_hourly"),
     goodObservationCount: inWindow.filter(item => item.quality === "GOOD").length,
     staleObservationCount: inWindow.filter(item => item.quality === "STALE").length,
     invalidObservationCount: inWindow.filter(item => item.quality === "INVALID").length,

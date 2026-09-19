@@ -4,7 +4,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
-import { getDharaliHistoricalWeather, getDharaliLiveData, historicalDharaliEvents } from "./liveData";
+import { getDharaliHistoricalWeather, getDharaliLiveData, historicalDharaliEvents, historicalDharaliEvidence } from "./liveData";
 import { createAlertDraft, createEmailUser, createFieldReport, createFloodEvent, ensureDemoAccounts, getAssignmentCandidates, getCommandTasks, getFloodEvents, getOperationalResources, getRecentAlerts, getRecentAuditEvents, getRecentFieldReports, getRecentFloodPredictions, getRecentSensorReadings, getUserByEmail, recordAlertDecision, recordFloodPrediction, recordSensorReadings, setCommandTaskStatus, updateAlertStatus, updateFieldReportStatus, updateOperationalResource } from "./db";
 import { hashPassword, sdk, verifyPassword } from "./_core/sdk";
 import { evaluateFlashFloodAlert } from "@shared/alertPolicy";
@@ -55,7 +55,7 @@ const reportInput = z.object({
 
 const sensorReadingInput = z.object({
   sensorKey: z.string().trim().min(3).max(64),
-  metric: z.enum(["rain_15m", "river_rise_30m", "soil_saturation", "debris_likelihood"]),
+  metric: z.enum(["rain_15m", "river_rise_30m", "soil_saturation", "debris_likelihood", "wind_speed_hourly"]),
   value: z.number().finite(),
   unit: z.string().trim().min(1).max(24),
   observedAt: z.coerce.date(),
@@ -103,6 +103,7 @@ export const appRouter = router({
   liveData: router({
     dharali: publicProcedure.query(() => getDharaliLiveData()),
     historical: publicProcedure.query(() => historicalDharaliEvents),
+    evidence: publicProcedure.query(() => historicalDharaliEvidence),
     historicalWeather: publicProcedure.query(() => getDharaliHistoricalWeather()),
   }),
   sensors: router({

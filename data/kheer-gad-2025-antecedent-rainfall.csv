@@ -1,0 +1,5 @@
+locationKey,eventKey,windowDays,rainfallMm,source,sourceResolution,observedDate,notes
+DHARALI,DHARALI-KHEERGAD-2025-08-05,3,29,FLDAS-Global,0.01 degree,2025-08-05,"Antecedent total reported by Kumar et al. 2026; not a station observation."
+DHARALI,DHARALI-KHEERGAD-2025-08-05,7,59,FLDAS-Global,0.01 degree,2025-08-05,"Antecedent total reported by Kumar et al. 2026; not a station observation."
+DHARALI,DHARALI-KHEERGAD-2025-08-05,15,94,FLDAS-Global,0.01 degree,2025-08-05,"Antecedent total reported by Kumar et al. 2026; not a station observation."
+DHARALI,DHARALI-KHEERGAD-2025-08-05,30,195,FLDAS-Global,0.01 degree,2025-08-05,"Antecedent total reported by Kumar et al. 2026; not a station observation."

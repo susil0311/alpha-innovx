@@ -1,0 +1,2 @@
+eventKey,locationKey,startedAt,severity,verified,verificationSource,latitude,longitude,catchmentAreaKm2,notes
+DHARALI-KHEERGAD-2025-08-05,DHARALI,2025-08-05,DEBRIS_FLOW,true,Kumar et al. 2026 Current Science DOI 10.18520/cs/v130/i3/229-238,31.0407,78.7972,17,"Historical event reconstruction; Kheer Gad tributary of Bhagirathi River; use for backtesting and validation, not as a live sensor record."

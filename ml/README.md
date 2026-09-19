@@ -23,6 +23,20 @@ The CSV must contain the following columns:
 
 Rows must be generated from real observations using the shared feature-window utility. The event label must come from a verified field report, official bulletin, camera review, or district incident record. Never label a row from the model's own prediction.
 
+## Kheer Gad historical evidence enrichment
+
+The Kumar et al. (2026) paper data is available as static and antecedent context. It must not be used to manufacture additional positive rows. Enrich a real labeled feature-window export only when its `locationKey` is `DHARALI`:
+
+```bash
+python ml/enrich_feature_windows.py \
+  --windows exports/dharali_feature_windows.csv \
+  --catchment-features data/kheer-gad-catchment-features.csv \
+  --antecedent-rainfall data/kheer-gad-2025-antecedent-rainfall.csv \
+  --output exports/dharali_feature_windows_enriched.csv
+```
+
+The enrichment adds catchment morphology, historical debris-spread context, and reported 3/7/15/30-day antecedent rainfall totals. `train_model.py` consumes these columns when present and records them in `metrics.json`. The paper-derived values remain historical context; they are not live observations and do not replace a multi-event labeled dataset.
+
 ## Training and evaluation
 
 ```bash
